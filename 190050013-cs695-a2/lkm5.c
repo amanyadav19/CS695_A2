@@ -11,7 +11,9 @@ extern struct task_struct init_task;
 #define for_each_process(p) \
         for (p = &init_task ; (p = next_task(p)) != &init_task ; )
 
-int pid = 104053;
+int pid = 0;
+module_param(pid, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(pid, "PID of the process");
 
 static struct page *walk_page_table(struct task_struct* c, unsigned long addr)
 {
@@ -43,8 +45,11 @@ static struct page *walk_page_table(struct task_struct* c, unsigned long addr)
     ptep = pte_offset_map(pmd, addr);
     if (!ptep)
         goto out;
-    pte = *ptep;
 
+    pte = *ptep;
+    if(!pte_present(pte)) {
+        goto out;
+    }
     page = pte_page(pte);
  out:
     return page;
@@ -61,14 +66,18 @@ static int find_running_processes(void)
             struct vm_area_struct *vma = 0;
             unsigned long sum = 0;
             unsigned long psum = 0;
-            if (task_list->mm && task_list->mm->mmap)
+            if (task_list->mm && task_list->mm->mmap && task_list->pid == pid) {
                 for (vma = task_list->mm->mmap; vma; vma = vma->vm_next) {
+                    unsigned long i = 0;
                     sum += vma->vm_end - vma->vm_start;
-                    if(walk_page_table(task_list, vma->vm_start)) {
-                        psum += vma->vm_end - vma->vm_start;
+                    for(i= vma->vm_start; i <= vma->vm_end; i+=1024*4) {
+                        if(walk_page_table(task_list, i) != NULL) {
+                            psum += 4*1024;
+                        }
                     }
                 }
-            printk(KERN_INFO "PID:[%d]\ttotal virtual memory (in Bytes): %lu, physical_vm (in Bytes) %lu\n", task_list->pid, sum, psum);
+                printk(KERN_INFO "PID:[%d]\ttotal virtual memory (in Bytes): %lu, total physical memory(in Bytes) %lu\n", task_list->pid, sum, psum);
+            }
         }
     }
     return 0;

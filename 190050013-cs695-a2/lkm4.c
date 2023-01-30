@@ -15,12 +15,12 @@ extern struct task_struct init_task;
 #define for_each_process(p) \
         for (p = &init_task ; (p = next_task(p)) != &init_task ; )
 
-int pid = 94238;
-unsigned long virtual_address = 0xaaaaecc36eb0;
-// module_param(pid, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-// MODULE_PARM_DESC(pid, "PID of the process");
-// module_param(virtual_address, long, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-// MODULE_PARM_DESC(virtual_address, "Virtual address in the process space");
+int pid = 0;
+unsigned long virtual_address = 0;
+module_param(pid, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(pid, "PID of the process");
+module_param(virtual_address, ulong, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+MODULE_PARM_DESC(virtual_address, "Virtual address in the process space");
 
 static struct page *walk_page_table(struct task_struct* c, unsigned long addr)
 {
@@ -53,7 +53,6 @@ static struct page *walk_page_table(struct task_struct* c, unsigned long addr)
     if (!ptep)
         goto out;
     pte = *ptep;
-
     page = pte_page(pte);
  out:
     return page;
@@ -67,7 +66,7 @@ static int find_running_processes(void)
 
     if(virtual_address <= 0xffffffffffffffff && virtual_address >= 0xffff800000000000) {
         // This is a kernel address;
-        printk(KERN_INFO "Physical Address: 0x%llx\n", virt_to_phys((void *)virtual_address));
+        printk(KERN_INFO "Physical Address: 0x%lx\n", virt_to_phys((void *)virtual_address));
     } else {
         int k = 0;
         for_each_process(task_list) {
@@ -77,10 +76,9 @@ static int find_running_processes(void)
                     printk(KERN_INFO "No mapping exists\n");
                     k = 1;
                 } else {
-                    printk(KERN_INFO "Physical Address: 0x%lx\n", ((unsigned long)&p & (virtual_address & 0b111111111111)));
+                    printk(KERN_INFO "Physical Address: 0x%lx\n", (page_to_phys(p) | (virtual_address & ((1<<PAGE_SHIFT)-1))));
                     k = 1;
                 }
-                break;
             }
         }
         if(k == 0) {
